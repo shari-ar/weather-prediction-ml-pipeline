@@ -1,0 +1,4 @@
+# Development requirements for the weather prediction ML pipeline.
+# These packages are used only for testing and linting during development and CI.
+pytest>=9.0.2,<10.0.0
+ruff>=0.14.14,<1.0.0
