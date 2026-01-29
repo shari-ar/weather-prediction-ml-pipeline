@@ -1,0 +1,20 @@
+{
+  // Name of the dev container; appears in VS Code when opening the folder.
+  "name": "weather-ml-dev",
+  // Build context for the Dockerfile. Setting this to .. means the
+  // container will be built from the repository root.
+  "context": "..",
+  // Relative path to the Dockerfile used to build the development image.
+  "dockerFile": "Dockerfile",
+  // Folder inside the container that will be treated as the workspace.
+  "workspaceFolder": "/workspace",
+  // Recommended extensions for Python development and linting.
+  "extensions": [
+    "ms-python.python",
+    "ms-python.vscode-pylance"
+  ],
+  // Custom settings for VS Code inside the container.
+  "settings": {
+    "python.pythonPath": "/usr/local/bin/python"
+  }
+}
