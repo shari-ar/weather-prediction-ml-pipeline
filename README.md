@@ -1,173 +1,108 @@
 # Weather Prediction ML Pipeline
-A fully containerized machine learning project that collects real-time weather data via the OpenWeatherMap API, preprocesses it, and trains predictive models inside a reproducible Docker DevContainer environment.
 
----
+End-to-end machine learning workflow for fetching hourly weather data from the
+OpenWeatherMap One Call API, preparing features, training a RandomForest model,
+and persisting the trained model for later use.
 
-## 1. Overview
-This document provides a complete technical guide for setting up a weather prediction machine learning project in a reproducible **Docker-based development environment** using **VS Code Dev Containers**. The system fetches weather data from the OpenWeatherMap API, preprocesses it, and trains a simple predictive model using scikit-learn.
+## Highlights
+- Fetches hourly weather observations from OpenWeatherMap (One Call 3.0).
+- Stores cleaned data as a CSV with a UTC datetime index.
+- Trains a RandomForest regressor to predict next-hour temperature.
+- Includes test coverage for core utilities and data transformations.
 
----
-
-## 2. Project Structure
+## Project Structure
 ```plaintext
-weather-prediction-project/
-│  ├── .devcontainer/
-│  │    ├── devcontainer.json
-│  │    └── Dockerfile
-│  ├── src/
-│  │    ├── data_ingest.py
-│  │    ├── train.py
-│  │    └── model.py
-│  ├── requirements.txt
-│  └── README.md
+.
+├── .devcontainer/
+│   └── devcontainer.json
+├── src/
+│   ├── data_ingest.py
+│   ├── model.py
+│   ├── train.py
+│   └── utils.py
+├── tests/
+│   ├── test_data_ingest.py
+│   ├── test_model.py
+│   └── test_utils.py
+├── requirements.txt
+└── README.md
 ```
 
----
+## Prerequisites
+- Python 3.11+
+- An OpenWeatherMap API key (for the One Call API 3.0 endpoint)
 
-## 3. Dev Container Configuration
-
-### 3.1 devcontainer.json
-```json
-{
-  "name": "weather-ml-dev",
-  "context": "..",
-  "dockerFile": "Dockerfile",
-  "workspaceFolder": "/workspace",
-  "extensions": [
-    "ms-python.python",
-    "ms-python.vscode-pylance"
-  ],
-  "settings": {
-    "python.pythonPath": "/usr/local/bin/python"
-  }
-}
+## Installation
+Create a virtual environment, then install dependencies:
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 ```
 
-### 3.2 Dockerfile
-```dockerfile
-FROM python:3.11-slim
-
-WORKDIR /workspace
-
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY src/ ./src/
-
-CMD ["bash"]
+## Configuration
+Set your OpenWeatherMap API key in an environment variable or a `.env` file in
+the project root:
+```bash
+export OPENWEATHERMAP_API_KEY="your_api_key_here"
 ```
 
-### 3.3 requirements.txt
-```
-pandas>=2.0
-scikit-learn>=1.3
-requests>=2.30
-```
+> The ingestion script loads `.env` automatically when `python-dotenv` is
+> installed (it is included in `requirements.txt`).
 
-You may optionally add:
-```
-matplotlib
-streamlit
-```
-for visualization and web interface purposes.
-
----
-
-## 4. Data Ingestion (OpenWeatherMap API)
-
-Create `src/data_ingest.py`:
-
-```python
-import requests
-import pandas as pd
-
-API_KEY = "YOUR_API_KEY"  # Replace with your OpenWeatherMap API key
-BASE_URL = "https://api.openweathermap.org/data/2.5/onecall"
-
-def fetch_weather(lat, lon):
-    params = {
-        "lat": lat,
-        "lon": lon,
-        "appid": API_KEY,
-        "units": "metric"
-    }
-    response = requests.get(BASE_URL, params=params)
-    response.raise_for_status()
-    return response.json()
-
-def to_dataframe(json_data):
-    df = pd.json_normalize(json_data, record_path=["hourly"])
-    return df
-
-if __name__ == "__main__":
-    lat, lon = 52.52, 13.405  # Berlin example
-    data = fetch_weather(lat, lon)
-    df = to_dataframe(data)
-    df.to_csv("weather_hourly.csv", index=False)
-    print("Weather data saved as weather_hourly.csv")
+## Data Ingestion
+Fetch hourly weather data and save it as a CSV file:
+```bash
+python src/data_ingest.py --lat 52.52 --lon 13.405 --output data/weather_hourly.csv
 ```
 
----
+Key details:
+- Endpoint: `https://api.openweathermap.org/data/3.0/onecall`
+- Units: metric
+- Output: CSV with a UTC datetime index
 
-## 5. Model Training
-
-Create `src/train.py`:
-
-```python
-import pandas as pd
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.model_selection import train_test_split
-
-df = pd.read_csv("weather_hourly.csv")
-
-# Feature and target selection
-X = df[['temp', 'humidity', 'pressure', 'wind_speed']]
-y = df['temp'].shift(-1).dropna()
-X = X.iloc[:-1]
-
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-model = RandomForestRegressor(n_estimators=100, random_state=42)
-model.fit(X_train, y_train)
-
-score = model.score(X_test, y_test)
-print(f"Model R² score: {score:.3f}")
+## Model Training
+Train a RandomForest regressor and save the model artifact:
+```bash
+python src/train.py --data data/weather_hourly.csv --model models/weather_model.joblib
 ```
 
----
+The training pipeline:
+1. Reads the CSV into a DataFrame.
+2. Generates features and the next-hour target value.
+3. Splits the data into train/test sets.
+4. Trains a RandomForest and prints the R² score.
+5. Saves the model with `joblib`.
 
-## 6. Running in VS Code Dev Container
+### Optional Training Parameters
+```bash
+python src/train.py \
+  --data data/weather_hourly.csv \
+  --model models/weather_model.joblib \
+  --test-size 0.2 \
+  --n-estimators 200 \
+  --log-level INFO
+```
 
-1. **Ensure Docker is installed and running.**  
-2. Open the folder in **VS Code** → Command Palette → `Remote-Containers: Open Folder in Container`.  
-3. Once the container builds, open the terminal and execute:
-   ```bash
-   python src/data_ingest.py
-   python src/train.py
-   ```
-4. You may extend the project using **Streamlit** for real-time dashboarding:
-   ```bash
-   streamlit run src/dashboard.py
-   ```
+## Development in VS Code Dev Container
+This repository includes a `.devcontainer/devcontainer.json` configuration for
+VS Code Dev Containers. Open the folder in VS Code and select:
+`Dev Containers: Reopen in Container`.
 
----
+## Testing
+Run the test suite with:
+```bash
+pytest
+```
 
-## 7. Best Practices
-- Pin dependency versions in `requirements.txt` for reproducibility.
-- Rebuild the container whenever you modify dependencies.
-- Use Docker volumes for large datasets to improve performance.
-- Store API keys securely via environment variables or `.env` files.
-- For production, consider **multi-stage builds** to minimize image size.
+## Notes & Best Practices
+- Keep API keys out of source control by using `.env` files.
+- Store generated data and model artifacts in dedicated folders (`data/`,
+  `models/`) to keep the repository tidy.
+- The One Call API endpoint requires a paid plan on OpenWeatherMap; confirm your
+  account access before running ingestion.
 
----
-
-## 8. References
+## References
 - [OpenWeatherMap API Documentation](https://openweathermap.org/api)
-- [VS Code Dev Containers Guide](https://code.visualstudio.com/docs/devcontainers/containers)
-- [Docker Official Docs](https://docs.docker.com/)
+- [VS Code Dev Containers](https://code.visualstudio.com/docs/devcontainers/containers)
 - [scikit-learn Documentation](https://scikit-learn.org/stable/)
-
----
-
-**Professional Recommendation:**  
-Containerize and publish this project to GitHub, then connect it with GitHub Codespaces for instant cloud-based development and training anywhere.
