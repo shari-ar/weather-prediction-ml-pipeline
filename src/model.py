@@ -57,9 +57,17 @@ def prepare_features(df: pd.DataFrame, target_column: str = "temp") -> Tuple[pd.
     X = df[existing_features].copy()
     # Shift the target by -1 (next timestep). dropna removes the last row,
     # which has no future value.
-    y = df[target_column].shift(-1).dropna()
+    y = df[target_column].shift(-1)
     X = X.iloc[:-1]  # align lengths after shifting
-    return X, y
+    y = y.iloc[:-1]
+
+    # Drop rows with missing feature or target values to avoid training
+    # failures in estimators that cannot handle NaNs.
+    combined = X.copy()
+    combined["_target"] = y
+    combined = combined.dropna()
+    y = combined.pop("_target")
+    return combined, y
 
 
 def split_data(

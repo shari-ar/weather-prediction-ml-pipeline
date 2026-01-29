@@ -41,6 +41,16 @@ def test_split_data():
     assert len(y_train) + len(y_test) == len(y)
 
 
+def test_prepare_features_drops_missing_values():
+    df = _generate_df(8)
+    df.loc[df.index[2], "wind_gust"] = np.nan
+    X, y = model.prepare_features(df)
+    assert not X.isna().any().any()
+    assert not y.isna().any()
+    # One row dropped for shift, one for NaN in features
+    assert len(X) == len(df) - 2
+
+
 def test_train_evaluate_and_persist(tmp_path):
     df = _generate_df(12)
     X, y = model.prepare_features(df)
